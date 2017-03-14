@@ -1,6 +1,7 @@
 package ru.spbstu.terrai.lab
 
 import ru.spbstu.terrai.core.*
+import ru.spbstu.terrai.feature.visualize
 import java.util.*
 
 class Controller(private val lab: Labyrinth, private val player: Player) {
@@ -82,6 +83,8 @@ class Controller(private val lab: Labyrinth, private val player: Player) {
         player.setMoveResult(moveResult)
         if (moveResult.successful) {
             moves++
+            lab.visualize(playerLocation)
+            Thread.sleep(600)
         }
         return GameResult(moves, playerCondition.exitReached)
     }
