@@ -4,8 +4,15 @@ import ru.spbstu.terrai.core.*
 import java.util.*
 import kotlin.collections.HashMap
 
+val wideRand = Random()
+fun getRandomDirection(): Direction {
+    return Direction.values()[wideRand.nextInt(4)]
+}
+
 abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
+    val rand = Random()
     val map: HashMap<Location, Room>
+
     var location: Location
     var newLocation: Location
 
@@ -15,6 +22,8 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
     var hasPlan = false
     var foundTreasure = false
     var steps = ArrayDeque<Direction>()
+
+    var left = rand.nextBoolean()
 
     init {
         if (strategy == null) {
@@ -28,7 +37,50 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
         newLocation = location
     }
 
-    internal fun bfs(room: Room? = null): Boolean {
+    fun nextStep(): Direction? {
+        if (foundTreasure) {
+            foundTreasure = false
+            if (findPath(Exit)) {
+                hasPlan = true
+            }
+        }
+
+        if (hasPlan) {
+            if (steps.isNotEmpty()) {
+                lastDirection = steps.poll()
+            } else {
+                hasPlan = false
+            }
+        } else {
+            lastDirection = nextDirection()
+        }
+
+        if (lastDirection == null && (findPath(null) || findPath(Wormhole(0)))) {
+            lastDirection = steps.poll()
+            hasPlan = true
+        }
+
+        if (lastDirection != null) {
+            newLocation = lastDirection!! + location
+        }
+
+        return lastDirection
+    }
+
+    fun applyResult(res: MoveResult) {
+        map[newLocation] = res.room
+        lastRoom = res.room
+
+        if (res.successful) {
+            location = newLocation
+
+            if (res.condition.hasTreasure) {
+                foundTreasure = true
+            }
+        }
+    }
+
+    internal fun findPath(room: Room? = null): Boolean {
         val used = HashSet<Location>()
         val queue = ArrayDeque<Location>()
         val path = HashMap<Location, Direction?>()
@@ -77,25 +129,11 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
         return true
     }
 
-    fun applyResult(res: MoveResult) {
-        map[newLocation] = res.room
-        lastRoom = res.room
-
-        if (res.successful) {
-            location = newLocation
-
-            if (res.condition.hasTreasure) {
-                foundTreasure = true
-            }
+    internal fun turn(dir: Direction?, reverse: Boolean): Direction {
+        return when (left xor reverse) {
+            true -> dir?.turnLeft() ?: getRandomDirection()
+            false -> dir?.turnRight() ?: getRandomDirection()
         }
-    }
-
-    fun nextStep(): Direction? {
-        lastDirection = nextDirection()
-        if (lastDirection != null) {
-            newLocation = lastDirection!! + location
-        }
-        return lastDirection
     }
 
     abstract fun nextDirection(): Direction?
@@ -104,22 +142,7 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
 
 class Spiral(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(strategy, isHole) {
 
-    val left = wideRand.nextBoolean()
-
     override fun nextDirection(): Direction? {
-        if (foundTreasure) {
-            foundTreasure = false
-            if (bfs(Exit)) {
-                hasPlan = true
-            }
-        }
-
-        if (hasPlan && steps.isNotEmpty()) {
-            return steps.poll()
-        } else {
-            hasPlan = false
-        }
-
         var newDirection: Direction? = turn(lastDirection, false)
 
         var nxt: Location = newDirection!! + location
@@ -131,22 +154,73 @@ class Spiral(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(str
         }
 
         if (cnt == 4) {
-            hasPlan = true
-            if (!bfs(null) && !bfs(Wormhole(0))) {
-                newDirection = null
-            } else {
-                newDirection = nextDirection()
-            }
+            return null
         }
 
         return newDirection
     }
 
-    private fun turn(dir: Direction?, reverse: Boolean): Direction {
-        return when (left xor reverse) {
-            true -> dir?.turnLeft() ?: getRandomDirection()
-            false -> dir?.turnRight() ?: getRandomDirection()
+}
+
+class Chaotic(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(strategy, isHole) {
+
+    override fun nextDirection(): Direction? {
+        var newDirection = when (rand.nextInt(3)) {
+            0 -> lastDirection?.turnLeft()
+            1 -> lastDirection
+            2 -> lastDirection?.turnRight()
+            else -> null
         }
+        if (newDirection == null) {
+            newDirection = getRandomDirection()
+        }
+
+        left = rand.nextBoolean()
+        var nxt = newDirection + location
+        var cnt = 0
+        while (map.containsKey(nxt) && cnt < 4) {
+            newDirection = turn(newDirection, false)
+            nxt = newDirection + location
+            ++cnt
+        }
+
+        if (cnt == 4) {
+            return null
+        }
+
+        return newDirection
+    }
+
+}
+
+class Return(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(strategy, isHole) {
+
+    val start: Location = location
+
+    override fun nextDirection(): Direction? {
+        if (start == location) {
+            var newDirection = if (lastDirection == null) {
+                getRandomDirection()
+            } else {
+                lastDirection as Direction
+            }
+
+            var nxt = newDirection + location
+            var cnt = 0
+            while (map.containsKey(nxt) && cnt < 4) {
+                newDirection = turn(newDirection, false)
+                nxt = newDirection + location
+                ++cnt
+            }
+
+            if (cnt == 4) {
+                return null
+            }
+
+            return newDirection
+        }
+
+        return lastDirection!!.turnBack()
     }
 
 }
