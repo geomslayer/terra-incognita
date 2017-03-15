@@ -9,32 +9,23 @@ fun getRandomDirection(): Direction {
     return Direction.values()[wideRand.nextInt(4)]
 }
 
-abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
-    val rand = Random()
-    val map: HashMap<Location, Room>
+abstract class Strategy(startRoom: Room) {
+    protected val rand = Random()
+    protected val map = HashMap<Location, Room>()
 
-    var location: Location
-    var newLocation: Location
+    protected var location = Location(0, 0)
+    protected var newLocation = Location(0, 0)
 
-    var lastRoom: Room? = null
-    var lastDirection: Direction? = null
+    protected var lastDirection: Direction? = null
 
-    var hasPlan = false
-    var foundTreasure = false
-    var steps = ArrayDeque<Direction>()
+    protected var hasPlan = false
+    protected var foundTreasure = false
+    protected var steps = ArrayDeque<Direction>()
 
-    var left = rand.nextBoolean()
+    protected var left = rand.nextBoolean()
 
     init {
-        if (strategy == null) {
-            map = HashMap<Location, Room>()
-            location = Location(0, 0)
-        } else {
-            map = strategy.map
-            location = strategy.location
-        }
-        map[location] = if (isHole) Wormhole(0) else Empty
-        newLocation = location
+        map[location] = startRoom
     }
 
     fun nextStep(): Direction? {
@@ -69,7 +60,6 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
 
     fun applyResult(res: MoveResult) {
         map[newLocation] = res.room
-        lastRoom = res.room
 
         if (res.successful) {
             location = newLocation
@@ -80,7 +70,7 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
         }
     }
 
-    internal fun findPath(room: Room? = null): Boolean {
+    protected fun findPath(room: Room? = null): Boolean {
         val used = HashSet<Location>()
         val queue = ArrayDeque<Location>()
         val path = HashMap<Location, Direction?>()
@@ -129,7 +119,7 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
         return true
     }
 
-    internal fun turn(dir: Direction?, reverse: Boolean): Direction {
+    protected fun turn(dir: Direction?, reverse: Boolean): Direction {
         return when (left xor reverse) {
             true -> dir?.turnLeft() ?: getRandomDirection()
             false -> dir?.turnRight() ?: getRandomDirection()
@@ -140,20 +130,22 @@ abstract class Strategy(strategy: Strategy? = null, isHole: Boolean = false) {
 
 }
 
-class Spiral(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(strategy, isHole) {
+val TURNS = 4
+
+class Spiral(startRoom: Room) : Strategy(startRoom) {
 
     override fun nextDirection(): Direction? {
         var newDirection: Direction? = turn(lastDirection, false)
 
         var nxt: Location = newDirection!! + location
         var cnt = 0
-        while (map[nxt] != null && cnt < 4) {
+        while (map[nxt] != null && cnt < TURNS) {
             newDirection = turn(newDirection, true)
             nxt = newDirection + location
             ++cnt
         }
 
-        if (cnt == 4) {
+        if (cnt == TURNS) {
             return null
         }
 
@@ -162,7 +154,7 @@ class Spiral(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(str
 
 }
 
-class Chaotic(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(strategy, isHole) {
+class Chaotic(startRoom: Room) : Strategy(startRoom) {
 
     override fun nextDirection(): Direction? {
         var newDirection = when (rand.nextInt(3)) {
@@ -178,13 +170,13 @@ class Chaotic(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(st
         left = rand.nextBoolean()
         var nxt = newDirection + location
         var cnt = 0
-        while (map.containsKey(nxt) && cnt < 4) {
+        while (map.containsKey(nxt) && cnt < TURNS) {
             newDirection = turn(newDirection, false)
             nxt = newDirection + location
             ++cnt
         }
 
-        if (cnt == 4) {
+        if (cnt == TURNS) {
             return null
         }
 
@@ -193,9 +185,9 @@ class Chaotic(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(st
 
 }
 
-class Return(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(strategy, isHole) {
+class Return(startRoom: Room) : Strategy(startRoom) {
 
-    val start: Location = location
+    private val start: Location = location
 
     override fun nextDirection(): Direction? {
         if (start == location) {
@@ -207,13 +199,13 @@ class Return(strategy: Strategy? = null, isHole: Boolean = false) : Strategy(str
 
             var nxt = newDirection + location
             var cnt = 0
-            while (map.containsKey(nxt) && cnt < 4) {
+            while (map.containsKey(nxt) && cnt < TURNS) {
                 newDirection = turn(newDirection, false)
                 nxt = newDirection + location
                 ++cnt
             }
 
-            if (cnt == 4) {
+            if (cnt == TURNS) {
                 return null
             }
 

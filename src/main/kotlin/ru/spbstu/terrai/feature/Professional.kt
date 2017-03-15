@@ -4,15 +4,12 @@ import ru.spbstu.terrai.core.*
 import java.util.*
 
 class Professional : Player {
-    val rand = Random()
+    private val rand = Random()
 
-    var width = 0
-    var height = 0
-    var strategy = getStrategy(false)
+    private var strategy = getStrategy()
 
     override fun setStartLocationAndSize(location: Location, width: Int, height: Int) {
-        this.height = height
-        this.width = width
+
     }
 
     override fun getNextMove(): Move {
@@ -23,7 +20,7 @@ class Professional : Player {
     override fun setMoveResult(result: MoveResult) {
         when (result.room) {
             is Wormhole -> {
-                strategy = getStrategy(true)
+                strategy = getStrategy(Wormhole(0))
             }
             else -> {
                 strategy.applyResult(result)
@@ -31,12 +28,12 @@ class Professional : Player {
         }
     }
 
-    private fun getStrategy(isHole: Boolean): Strategy {
-        val mod = 4 - if (isHole) 0 else 1
-        return when(rand.nextInt(mod)) {
-            0 -> Spiral(isHole = isHole)
-            1, 2 -> Chaotic(isHole = isHole)
-            else -> Return(isHole = isHole)
+    private fun getStrategy(startRoom: Room = Empty): Strategy {
+        val mod = 4 - if (startRoom is Wormhole) 0 else 1
+        return when (rand.nextInt(mod)) {
+            0 -> Spiral(startRoom)
+            1, 2 -> Chaotic(startRoom)
+            else -> Return(startRoom)
         }
     }
 
